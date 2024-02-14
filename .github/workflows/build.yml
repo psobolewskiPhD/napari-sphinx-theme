@@ -1,0 +1,57 @@
+name: Build Example on PR
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+    build-and-upload-artifact:
+        name: Build & Upload Artifact
+        permissions:
+          contents: write
+          id-token: write
+        runs-on: ${{ matrix.os }}
+        strategy:
+          matrix:
+            os: [ubuntu-latest]
+            python-version: [3.9]
+        steps:
+          - uses: actions/checkout@v4
+    
+          - name: Set up Python ${{ matrix.python-version }}
+            uses: actions/setup-python@v5
+            with:
+              python-version: ${{ matrix.python-version }}
+    
+          # Install dependencies
+          - name: Install dependencies
+            run: |
+              # Install Python dependencies
+              pip install --upgrade pip build ".[doc]"
+    
+          # Build and install the theme package.
+          - name: Build and install theme
+            env:
+              ENV: prod
+            run: |
+              python -m build
+              pip install dist/napari_sphinx_theme*.whl
+    
+          # Build the documentation.
+          - name: Build docs
+            env:
+              GOOGLE_CALENDAR_API_KEY: ${{ secrets.GOOGLE_CALENDAR_API_KEY }}
+            run: sphinx-build -b=html docs/ build/
+
+          # Upload artifact
+          - name: Upload artifact
+            uses: actions/upload-artifact@v3
+            with:
+                name: docs
+                path: build
